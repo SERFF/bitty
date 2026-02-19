@@ -1,8 +1,11 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const AutoLaunch = require('auto-launch');
 const bitwarden = require('./bitwarden');
+
+const ALLOWED_COPY_FIELDS = new Set(['username', 'password', 'uri', 'notes']);
+const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const autoLauncher = new AutoLaunch({
     name: 'Bitty',
@@ -14,11 +17,13 @@ const autoLauncher = new AutoLaunch({
 let mainWindow = null;
 let tray = null;
 let previousApp = null;
+let autoLockTimer = null;
 
 function savePreviousApp() {
     return new Promise((resolve) => {
-        exec(
-            `osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`,
+        execFile(
+            'osascript',
+            ['-e', 'tell application "System Events" to get name of first application process whose frontmost is true'],
             (error, stdout) => {
                 if (!error && stdout.trim()) {
                     previousApp = stdout.trim();
@@ -32,8 +37,10 @@ function savePreviousApp() {
 function restorePreviousApp() {
     if (!previousApp) return;
 
-    exec(
-        `osascript -e 'tell application "${previousApp}" to activate'`
+    const sanitized = previousApp.replace(/[^a-zA-Z0-9 ._-]/g, '');
+    execFile(
+        'osascript',
+        ['-e', `tell application "${sanitized}" to activate`]
     );
     previousApp = null;
 }
@@ -75,17 +82,31 @@ function createWindow() {
     });
 }
 
+function resetAutoLockTimer() {
+    if (autoLockTimer) clearTimeout(autoLockTimer);
+    autoLockTimer = setTimeout(async () => {
+        try {
+            await bitwarden.lock();
+            if (mainWindow) {
+                mainWindow.webContents.send('window:show');
+            }
+        } catch (_) { }
+    }, AUTO_LOCK_MS);
+}
+
 async function showWindow() {
     if (!mainWindow) return;
 
+    resetAutoLockTimer();
     await savePreviousApp();
 
     mainWindow.setAlwaysOnTop(true, 'floating');
     mainWindow.show();
     mainWindow.focus();
 
-    exec(
-        `osascript -e 'tell application "System Events" to set frontmost of every process whose unix id is ${process.pid} to true'`
+    execFile(
+        'osascript',
+        ['-e', `tell application "System Events" to set frontmost of every process whose unix id is ${process.pid} to true`]
     );
 
     mainWindow.webContents.send('window:show');
@@ -178,6 +199,8 @@ function registerShortcut() {
 function registerIpcHandlers() {
     ipcMain.handle('vault:search', async (_event, query) => {
         try {
+            if (typeof query !== 'string') return { success: false, error: 'Invalid query' };
+            resetAutoLockTimer();
             const items = bitwarden.searchItems(query);
             return { success: true, items };
         } catch (error) {
@@ -187,6 +210,8 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:item', async (_event, id) => {
         try {
+            if (typeof id !== 'string') return { success: false, error: 'Invalid id' };
+            resetAutoLockTimer();
             const item = bitwarden.getItemById(id);
             return { success: true, item };
         } catch (error) {
@@ -196,6 +221,9 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:copy', async (_event, id, field) => {
         try {
+            if (typeof id !== 'string') return { success: false, error: 'Invalid id' };
+            if (!ALLOWED_COPY_FIELDS.has(field)) return { success: false, error: 'Invalid field' };
+            resetAutoLockTimer();
             const copied = bitwarden.copyField(id, field);
             if (copied) {
                 dismissAndRestore();
@@ -217,11 +245,13 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:unlock', async (_event, password) => {
         try {
+            if (typeof password !== 'string') return { success: false, error: 'Invalid password' };
             console.log('[Bitty] Unlocking vault...');
             await bitwarden.unlock(password);
             console.log('[Bitty] Unlock successful, loading items...');
             await bitwarden.listItems();
             console.log('[Bitty] Items loaded');
+            resetAutoLockTimer();
             return { success: true };
         } catch (error) {
             console.error('[Bitty] Unlock failed:', error.message);
@@ -231,7 +261,8 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:login', async (_event, email, password) => {
         try {
-            console.log('[Bitty] Logging in as', email, '...');
+            if (typeof email !== 'string' || typeof password !== 'string') return { success: false, error: 'Invalid credentials' };
+            console.log('[Bitty] Logging in...');
             const result = await bitwarden.login(email, password);
 
             if (result.needsCode) {
@@ -242,6 +273,7 @@ function registerIpcHandlers() {
             console.log('[Bitty] Login successful, loading items...');
             await bitwarden.listItems();
             console.log('[Bitty] Items loaded');
+            resetAutoLockTimer();
             return { success: true };
         } catch (error) {
             console.error('[Bitty] Login failed:', error.message);
@@ -251,11 +283,13 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:submitCode', async (_event, code) => {
         try {
+            if (typeof code !== 'string') return { success: false, error: 'Invalid code' };
             console.log('[Bitty] Submitting verification code...');
             await bitwarden.submitCode(code);
             console.log('[Bitty] Verification successful, loading items...');
             await bitwarden.listItems();
             console.log('[Bitty] Items loaded');
+            resetAutoLockTimer();
             return { success: true };
         } catch (error) {
             console.error('[Bitty] Code submission failed:', error.message);
@@ -265,6 +299,7 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:lock', async () => {
         try {
+            if (autoLockTimer) clearTimeout(autoLockTimer);
             await bitwarden.lock();
             return { success: true };
         } catch (error) {
@@ -274,6 +309,7 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:sync', async () => {
         try {
+            resetAutoLockTimer();
             await bitwarden.sync();
             await bitwarden.listItems();
             return { success: true };
@@ -284,6 +320,8 @@ function registerIpcHandlers() {
 
     ipcMain.handle('vault:create', async (_event, data) => {
         try {
+            if (!data || typeof data.name !== 'string') return { success: false, error: 'Invalid item data' };
+            resetAutoLockTimer();
             console.log('[Bitty] Creating item:', data.name);
             await bitwarden.createItem(data);
             console.log('[Bitty] Item created and synced');

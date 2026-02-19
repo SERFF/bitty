@@ -180,14 +180,33 @@ function renderResults(selectionOnly = false) {
         const color = getMonogramColor(item.name);
         const letter = getMonogramLetter(item.name);
 
-        el.innerHTML = `
-      <div class="monogram" style="background: ${color}">${letter}</div>
-      <div class="result-item-text">
-        <span class="result-name">${escapeHtml(item.name)}</span>
-        <span class="result-username">${escapeHtml(item.username || '—')}</span>
-      </div>
-      <span class="result-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
-    `;
+        const monogram = document.createElement('div');
+        monogram.className = 'monogram';
+        monogram.style.background = color;
+        monogram.textContent = letter;
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'result-item-text';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'result-name';
+        nameSpan.textContent = item.name;
+
+        const userSpan = document.createElement('span');
+        userSpan.className = 'result-username';
+        userSpan.textContent = item.username || '\u2014';
+
+        textWrap.appendChild(nameSpan);
+        textWrap.appendChild(userSpan);
+
+        const chevron = document.createElement('span');
+        chevron.className = 'result-chevron';
+        chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>';
+
+        el.appendChild(monogram);
+        el.appendChild(textWrap);
+        el.appendChild(chevron);
+
         el.addEventListener('click', () => {
             selectedIndex = index;
             updateSelection();
@@ -225,14 +244,25 @@ function renderDetailFields(item) {
         el.className = `detail-field${index === selectedFieldIndex ? ' selected' : ''}`;
 
         const isMasked = field.masked && !passwordRevealed;
-        const displayValue = isMasked ? '••••••••' : escapeHtml(item[field.key]);
-        const revealHint = field.masked && index === selectedFieldIndex
-            ? `<span class="reveal-hint">${passwordRevealed ? '⌴ hide' : '⌴ reveal'}</span>` : '';
+        const displayValue = isMasked ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : item[field.key];
 
-        el.innerHTML = `
-      <div class="field-label">${field.label}${revealHint}</div>
-      <div class="field-value${isMasked ? ' masked' : ''}">${displayValue}</div>
-    `;
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'field-label';
+        labelDiv.textContent = field.label;
+
+        if (field.masked && index === selectedFieldIndex) {
+            const hint = document.createElement('span');
+            hint.className = 'reveal-hint';
+            hint.textContent = passwordRevealed ? '\u2334 hide' : '\u2334 reveal';
+            labelDiv.appendChild(hint);
+        }
+
+        const valueDiv = document.createElement('div');
+        valueDiv.className = `field-value${isMasked ? ' masked' : ''}`;
+        valueDiv.textContent = displayValue;
+
+        el.appendChild(labelDiv);
+        el.appendChild(valueDiv);
 
         el.addEventListener('click', () => {
             copyField(item.id, field.key);
@@ -260,7 +290,20 @@ function showToast(message) {
 
     const toast = document.createElement('div');
     toast.className = 'copied-toast';
-    toast.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${escapeHtml(message)}`;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2.5');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '20 6 9 17 4 12');
+    svg.appendChild(polyline);
+
+    toast.appendChild(svg);
+    toast.appendChild(document.createTextNode(message));
     document.body.appendChild(toast);
 
     setTimeout(() => toast.remove(), 1200);

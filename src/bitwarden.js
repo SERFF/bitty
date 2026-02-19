@@ -1,21 +1,26 @@
 const { spawn, execFile } = require('child_process');
 const { clipboard } = require('electron');
 
+const CLIPBOARD_CLEAR_MS = 30000;
+
 const BW_PATH = '/opt/homebrew/bin/bw';
 
 let sessionKey = null;
 let cachedItems = [];
 let pendingLoginProcess = null;
+let clipboardTimer = null;
 
 function runBw(args, options = {}) {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env };
+    const env = { ...(options.env || process.env) };
 
     if (sessionKey) {
       env.BW_SESSION = sessionKey;
     }
 
-    execFile(BW_PATH, args, { env, timeout: 30000, ...options }, (error, stdout, stderr) => {
+    const { env: _discardedEnv, ...restOptions } = options;
+
+    execFile(BW_PATH, args, { env, timeout: 30000, ...restOptions }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
         return;
@@ -25,9 +30,9 @@ function runBw(args, options = {}) {
   });
 }
 
-function runBwInteractive(args) {
+function runBwInteractive(args, envOverride = null) {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env };
+    const env = envOverride || { ...process.env };
 
     if (sessionKey) {
       env.BW_SESSION = sessionKey;
@@ -111,8 +116,8 @@ function login(email, password) {
   return new Promise((resolve, reject) => {
     killPendingLogin();
 
-    const env = { ...process.env };
-    const child = spawn(BW_PATH, ['login', email, password, '--raw'], {
+    const env = { ...process.env, BW_PASSWORD: password };
+    const child = spawn(BW_PATH, ['login', email, '--passwordenv', 'BW_PASSWORD', '--raw'], {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -239,7 +244,10 @@ function killPendingLogin() {
 }
 
 async function unlock(password) {
-  const output = await runBwInteractive(['unlock', password, '--raw']);
+  const output = await runBw(
+    ['unlock', '--passwordenv', 'BW_PASSWORD', '--raw'],
+    { env: { ...process.env, BW_PASSWORD: password } }
+  );
   sessionKey = output;
   return sessionKey;
 }
@@ -305,6 +313,15 @@ function copyField(id, field) {
   if (!value) return false;
 
   clipboard.writeText(value);
+
+  if (clipboardTimer) clearTimeout(clipboardTimer);
+  clipboardTimer = setTimeout(() => {
+    if (clipboard.readText() === value) {
+      clipboard.writeText('');
+    }
+    clipboardTimer = null;
+  }, CLIPBOARD_CLEAR_MS);
+
   return true;
 }
 
