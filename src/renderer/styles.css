@@ -859,6 +859,10 @@ kbd {
   border-top: 0.5px solid var(--border);
 }
 
+.settings-row.focused {
+  background: var(--bg-active);
+}
+
 .settings-row-stacked {
   flex-direction: column;
   align-items: stretch;

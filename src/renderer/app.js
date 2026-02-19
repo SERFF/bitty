@@ -69,6 +69,7 @@ const settingBwPath = document.getElementById('setting-bwpath');
 const settingServer = document.getElementById('setting-server');
 
 let previousState = State.LIST;
+let selectedSettingIndex = 0;
 
 const FIELDS = [
     { key: 'username', label: 'Username' },
@@ -551,6 +552,7 @@ document.addEventListener('keydown', (e) => {
     }
 
     if (currentState === State.SETTINGS) {
+        handleSettingsKeyboard(e);
         return;
     }
 
@@ -820,9 +822,88 @@ async function openSettingsView() {
 
     previousState = (currentState === State.SETTINGS) ? previousState : currentState;
     switchState(State.SETTINGS);
+    selectedSettingIndex = 0;
 
     const settings = await window.bitty.getSettings();
     populateSettings(settings);
+    updateSettingsSelection();
+}
+
+function getSettingsRows() {
+    return Array.from(settingsView.querySelectorAll('.settings-row'));
+}
+
+function updateSettingsSelection() {
+    const rows = getSettingsRows();
+    rows.forEach((row, i) => {
+        row.classList.toggle('focused', i === selectedSettingIndex);
+    });
+
+    const focused = rows[selectedSettingIndex];
+    if (focused) {
+        focused.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function handleSettingsKeyboard(e) {
+    const rows = getSettingsRows();
+    if (rows.length === 0) return;
+
+    const activeEl = document.activeElement;
+    const isEditingText = activeEl && (activeEl.tagName === 'INPUT' && activeEl.type === 'text');
+    const isEditingNumber = activeEl && (activeEl.tagName === 'INPUT' && activeEl.type === 'number');
+
+    if (isEditingText || isEditingNumber) {
+        if (e.key === 'Escape' || e.key === 'Enter') {
+            e.preventDefault();
+            activeEl.blur();
+        }
+        return;
+    }
+
+    if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+        e.preventDefault();
+        if (selectedSettingIndex < rows.length - 1) {
+            selectedSettingIndex++;
+        }
+        updateSettingsSelection();
+        return;
+    }
+
+    if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+        e.preventDefault();
+        if (selectedSettingIndex > 0) {
+            selectedSettingIndex--;
+        }
+        updateSettingsSelection();
+        return;
+    }
+
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const row = rows[selectedSettingIndex];
+        if (!row) return;
+
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
+        const select = row.querySelector('select');
+        if (select) {
+            select.focus();
+            select.showPicker?.();
+            return;
+        }
+
+        const input = row.querySelector('input');
+        if (input) {
+            input.focus();
+            return;
+        }
+    }
 }
 
 function populateSettings(s) {
