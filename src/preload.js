@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld('bitty', {
     generatePassword: (options) => ipcRenderer.invoke('vault:generatePassword', options),
     dismiss: () => ipcRenderer.invoke('window:dismiss'),
     onShow: (callback) => ipcRenderer.on('window:show', callback),
+    getSettings: () => ipcRenderer.invoke('settings:get'),
+    saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+    onOpenSettings: (callback) => ipcRenderer.on('window:openSettings', callback),
 });

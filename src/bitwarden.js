@@ -1,9 +1,14 @@
 const { spawn, execFile } = require('child_process');
 const { clipboard } = require('electron');
+const settings = require('./settings');
 
-const CLIPBOARD_CLEAR_MS = 30000;
+function getBwPath() {
+  return settings.get('bwPath');
+}
 
-const BW_PATH = '/opt/homebrew/bin/bw';
+function getClipboardClearMs() {
+  return settings.get('clipboardClearSeconds') * 1000;
+}
 
 let sessionKey = null;
 let cachedItems = [];
@@ -20,7 +25,7 @@ function runBw(args, options = {}) {
 
     const { env: _discardedEnv, ...restOptions } = options;
 
-    execFile(BW_PATH, args, { env, timeout: 30000, ...restOptions }, (error, stdout, stderr) => {
+    execFile(getBwPath(), args, { env, timeout: 30000, ...restOptions }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
         return;
@@ -38,7 +43,7 @@ function runBwInteractive(args, envOverride = null) {
       env.BW_SESSION = sessionKey;
     }
 
-    const child = spawn(BW_PATH, args, {
+    const child = spawn(getBwPath(), args, {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -117,7 +122,7 @@ function login(email, password) {
     killPendingLogin();
 
     const env = { ...process.env, BW_PASSWORD: password };
-    const child = spawn(BW_PATH, ['login', email, '--passwordenv', 'BW_PASSWORD', '--raw'], {
+    const child = spawn(getBwPath(), ['login', email, '--passwordenv', 'BW_PASSWORD', '--raw'], {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -315,12 +320,16 @@ function copyField(id, field) {
   clipboard.writeText(value);
 
   if (clipboardTimer) clearTimeout(clipboardTimer);
-  clipboardTimer = setTimeout(() => {
-    if (clipboard.readText() === value) {
-      clipboard.writeText('');
-    }
-    clipboardTimer = null;
-  }, CLIPBOARD_CLEAR_MS);
+
+  const clearMs = getClipboardClearMs();
+  if (clearMs > 0) {
+    clipboardTimer = setTimeout(() => {
+      if (clipboard.readText() === value) {
+        clipboard.writeText('');
+      }
+      clipboardTimer = null;
+    }, clearMs);
+  }
 
   return true;
 }

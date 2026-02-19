@@ -3,6 +3,7 @@ const State = {
     LIST: 'list',
     DETAIL: 'detail',
     ADD: 'add',
+    SETTINGS: 'settings',
 };
 
 const MONOGRAM_COLORS = [
@@ -47,6 +48,27 @@ const addUri = document.getElementById('add-uri');
 const addNotes = document.getElementById('add-notes');
 const addFormInputs = () => [addName, addUsername, addPassword, addUri, addNotes];
 
+const settingsView = document.getElementById('settings-view');
+const settingAutolock = document.getElementById('setting-autolock');
+const settingClipboard = document.getElementById('setting-clipboard');
+const settingLockOnClose = document.getElementById('setting-lockonclose');
+const settingLockScreen = document.getElementById('setting-lockscreen');
+const settingShortcut = document.getElementById('setting-shortcut');
+const settingLaunch = document.getElementById('setting-launch');
+const settingDock = document.getElementById('setting-dock');
+const settingTheme = document.getElementById('setting-theme');
+const settingPosition = document.getElementById('setting-position');
+const settingResults = document.getElementById('setting-results');
+const settingPwLength = document.getElementById('setting-pwlength');
+const settingPwUpper = document.getElementById('setting-pwupper');
+const settingPwLower = document.getElementById('setting-pwlower');
+const settingPwNumbers = document.getElementById('setting-pwnumbers');
+const settingPwSpecial = document.getElementById('setting-pwspecial');
+const settingBwPath = document.getElementById('setting-bwpath');
+const settingServer = document.getElementById('setting-server');
+
+let previousState = State.LIST;
+
 const FIELDS = [
     { key: 'username', label: 'Username' },
     { key: 'password', label: 'Password', masked: true },
@@ -75,6 +97,7 @@ function switchState(newState, options = {}) {
     unlockView.classList.toggle('hidden', newState !== State.UNLOCK);
     searchView.classList.toggle('hidden', newState !== State.LIST && newState !== State.DETAIL);
     addView.classList.toggle('hidden', newState !== State.ADD);
+    settingsView.classList.toggle('hidden', newState !== State.SETTINGS);
 
     if (newState === State.LIST) {
         detailPanel.classList.add('hidden');
@@ -485,13 +508,30 @@ document.addEventListener('keydown', (e) => {
             renderResults();
             return;
         }
+        if (currentState === State.SETTINGS) {
+            switchState(previousState);
+            if (previousState === State.LIST) {
+                performSearch(searchInput.value);
+            }
+            return;
+        }
         window.bitty.dismiss();
+        return;
+    }
+
+    if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        openSettingsView();
         return;
     }
 
     if (e.ctrlKey && e.key === 'n') {
         e.preventDefault();
         switchState(State.ADD);
+        return;
+    }
+
+    if (currentState === State.SETTINGS) {
         return;
     }
 
@@ -689,7 +729,7 @@ window.bitty.onShow(async () => {
     isTransitioning = true;
 
     try {
-        if (currentState === State.LIST || currentState === State.DETAIL) {
+        if (currentState === State.LIST || currentState === State.DETAIL || currentState === State.SETTINGS) {
             focusActiveInput();
             return;
         }
@@ -732,3 +772,124 @@ async function init() {
 }
 
 init();
+
+async function openSettingsView() {
+    if (currentState === State.UNLOCK) return;
+
+    previousState = (currentState === State.SETTINGS) ? previousState : currentState;
+    switchState(State.SETTINGS);
+
+    const settings = await window.bitty.getSettings();
+    populateSettings(settings);
+}
+
+function populateSettings(s) {
+    settingAutolock.value = String(s.autoLockMinutes);
+    settingClipboard.value = String(s.clipboardClearSeconds);
+    settingLockOnClose.checked = s.lockOnClose;
+    settingLockScreen.checked = s.lockOnScreenLock;
+    settingShortcut.value = formatShortcut(s.globalShortcut);
+    settingShortcut.dataset.raw = s.globalShortcut;
+    settingLaunch.checked = s.launchAtLogin;
+    settingDock.checked = s.showInDock;
+    settingTheme.value = s.theme;
+    settingPosition.value = s.windowPosition;
+    settingResults.value = String(s.resultsPerPage);
+    settingPwLength.value = String(s.passwordLength);
+    settingPwUpper.checked = s.passwordUppercase;
+    settingPwLower.checked = s.passwordLowercase;
+    settingPwNumbers.checked = s.passwordNumbers;
+    settingPwSpecial.checked = s.passwordSpecial;
+    settingBwPath.value = s.bwPath;
+    settingServer.value = s.serverUrl;
+}
+
+function collectSettings() {
+    return {
+        autoLockMinutes: parseInt(settingAutolock.value, 10),
+        clipboardClearSeconds: parseInt(settingClipboard.value, 10),
+        lockOnClose: settingLockOnClose.checked,
+        lockOnScreenLock: settingLockScreen.checked,
+        globalShortcut: settingShortcut.dataset.raw || 'Control+Space',
+        launchAtLogin: settingLaunch.checked,
+        showInDock: settingDock.checked,
+        theme: settingTheme.value,
+        windowPosition: settingPosition.value,
+        resultsPerPage: parseInt(settingResults.value, 10),
+        passwordLength: parseInt(settingPwLength.value, 10) || 20,
+        passwordUppercase: settingPwUpper.checked,
+        passwordLowercase: settingPwLower.checked,
+        passwordNumbers: settingPwNumbers.checked,
+        passwordSpecial: settingPwSpecial.checked,
+        bwPath: settingBwPath.value.trim() || '/opt/homebrew/bin/bw',
+        serverUrl: settingServer.value.trim(),
+    };
+}
+
+async function saveSettings() {
+    const data = collectSettings();
+    await window.bitty.saveSettings(data);
+}
+
+function formatShortcut(raw) {
+    if (!raw) return '';
+    return raw
+        .replace('Control', '⌃')
+        .replace('Alt', '⌥')
+        .replace('Shift', '⇧')
+        .replace('Command', '⌘')
+        .replace('Meta', '⌘')
+        .replace('Super', '⌘')
+        .replace(/\+/g, '')
+        .replace('Space', '␣');
+}
+
+settingShortcut.addEventListener('keydown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.key === 'Escape') {
+        settingShortcut.blur();
+        return;
+    }
+
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+
+    const parts = [];
+    if (e.ctrlKey) parts.push('Control');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.metaKey) parts.push('Command');
+
+    if (parts.length === 0) return;
+
+    const key = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    parts.push(key);
+
+    const raw = parts.join('+');
+    settingShortcut.dataset.raw = raw;
+    settingShortcut.value = formatShortcut(raw);
+    settingShortcut.blur();
+    saveSettings();
+});
+
+[
+    settingAutolock, settingClipboard, settingTheme, settingPosition, settingResults,
+].forEach((el) => el.addEventListener('change', saveSettings));
+
+[
+    settingLockOnClose, settingLockScreen, settingLaunch, settingDock,
+    settingPwUpper, settingPwLower, settingPwNumbers, settingPwSpecial,
+].forEach((el) => el.addEventListener('change', saveSettings));
+
+let settingsInputTimer = null;
+[settingPwLength, settingBwPath, settingServer].forEach((el) => {
+    el.addEventListener('input', () => {
+        clearTimeout(settingsInputTimer);
+        settingsInputTimer = setTimeout(saveSettings, 500);
+    });
+});
+
+window.bitty.onOpenSettings(() => {
+    openSettingsView();
+});

@@ -89,6 +89,182 @@
       </div>
     </div>
 
+    <div id="settings-view" class="view hidden">
+      <div class="settings-header">
+        <span class="settings-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </span>
+        <h2 class="settings-title">Settings</h2>
+      </div>
+
+      <div class="settings-body">
+        <div class="settings-section">
+          <div class="settings-section-title">Security</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <label class="settings-label" for="setting-autolock">Auto-lock timeout</label>
+              <select id="setting-autolock" class="settings-select">
+                <option value="1">1 minute</option>
+                <option value="2">2 minutes</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="0">Never</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-clipboard">Clear clipboard</label>
+              <select id="setting-clipboard" class="settings-select">
+                <option value="10">10 seconds</option>
+                <option value="15">15 seconds</option>
+                <option value="30">30 seconds</option>
+                <option value="60">60 seconds</option>
+                <option value="0">Never</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-lockonclose">Lock on close</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-lockonclose">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-lockscreen">Lock on screen lock</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-lockscreen">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">General</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <label class="settings-label" for="setting-shortcut">Global shortcut</label>
+              <input type="text" id="setting-shortcut" class="settings-input settings-shortcut-input" readonly
+                placeholder="Press keys…">
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-launch">Launch at login</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-launch">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-dock">Show in Dock</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-dock">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Appearance</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <label class="settings-label" for="setting-theme">Theme</label>
+              <select id="setting-theme" class="settings-select">
+                <option value="system">System</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-position">Window position</label>
+              <select id="setting-position" class="settings-select">
+                <option value="center">Center</option>
+                <option value="left">Top-left</option>
+                <option value="right">Top-right</option>
+                <option value="cursor">Follow cursor</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-results">Results per page</label>
+              <select id="setting-results" class="settings-select">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Password Generator</div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <label class="settings-label" for="setting-pwlength">Default length</label>
+              <input type="number" id="setting-pwlength" class="settings-input settings-number-input" min="8" max="128"
+                value="20">
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-pwupper">Uppercase (A-Z)</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-pwupper">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-pwlower">Lowercase (a-z)</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-pwlower">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-pwnumbers">Numbers (0-9)</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-pwnumbers">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="setting-pwspecial">Special (!@#$)</label>
+              <label class="settings-toggle">
+                <input type="checkbox" id="setting-pwspecial">
+                <span class="settings-toggle-track"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Bitwarden CLI</div>
+          <div class="settings-group">
+            <div class="settings-row settings-row-stacked">
+              <label class="settings-label" for="setting-bwpath">CLI path</label>
+              <input type="text" id="setting-bwpath" class="settings-input settings-text-input"
+                placeholder="/opt/homebrew/bin/bw" spellcheck="false">
+            </div>
+            <div class="settings-row settings-row-stacked">
+              <label class="settings-label" for="setting-server">Server URL</label>
+              <input type="text" id="setting-server" class="settings-input settings-text-input"
+                placeholder="Default (bitwarden.com)" spellcheck="false">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span class="status-indicator"></span>
+        <span class="shortcut-hints">
+          <kbd>esc</kbd> back
+        </span>
+      </div>
+    </div>
+
     <div id="search-view" class="view hidden">
       <div class="search-bar">
         <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"

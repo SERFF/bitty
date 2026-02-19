@@ -1,11 +1,11 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, screen, powerMonitor } = require('electron');
 const path = require('path');
 const { execFile } = require('child_process');
 const AutoLaunch = require('auto-launch');
 const bitwarden = require('./bitwarden');
+const settings = require('./settings');
 
 const ALLOWED_COPY_FIELDS = new Set(['username', 'password', 'uri', 'notes']);
-const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 const autoLauncher = new AutoLaunch({
     name: 'Bitty',
@@ -82,8 +82,17 @@ function createWindow() {
     });
 }
 
+function getAutoLockMs() {
+    const minutes = settings.get('autoLockMinutes');
+    return minutes > 0 ? minutes * 60 * 1000 : 0;
+}
+
 function resetAutoLockTimer() {
     if (autoLockTimer) clearTimeout(autoLockTimer);
+
+    const ms = getAutoLockMs();
+    if (ms <= 0) return;
+
     autoLockTimer = setTimeout(async () => {
         try {
             await bitwarden.lock();
@@ -91,7 +100,7 @@ function resetAutoLockTimer() {
                 mainWindow.webContents.send('window:show');
             }
         } catch (_) { }
-    }, AUTO_LOCK_MS);
+    }, ms);
 }
 
 async function showWindow() {
@@ -138,11 +147,12 @@ async function createTray() {
 }
 
 async function updateTrayMenu() {
-    const isAutoLaunch = await autoLauncher.isEnabled();
+    const shortcut = settings.get('globalShortcut');
+    const shortcutDisplay = shortcut.replace('Control', 'Ctrl').replace('+', '+');
 
     const contextMenu = Menu.buildFromTemplate([
         {
-            label: 'Show (Ctrl+Space)',
+            label: `Show (${shortcutDisplay})`,
             click: () => showWindow(),
         },
         {
@@ -155,17 +165,8 @@ async function updateTrayMenu() {
         },
         { type: 'separator' },
         {
-            label: 'Launch at Login',
-            type: 'checkbox',
-            checked: isAutoLaunch,
-            click: async () => {
-                if (isAutoLaunch) {
-                    await autoLauncher.disable();
-                } else {
-                    await autoLauncher.enable();
-                }
-                await updateTrayMenu();
-            },
+            label: 'Settings…',
+            click: () => openSettings(),
         },
         { type: 'separator' },
         {
@@ -187,13 +188,21 @@ async function updateTrayMenu() {
 }
 
 function registerShortcut() {
-    globalShortcut.register('Control+Space', async () => {
+    globalShortcut.unregisterAll();
+    const shortcut = settings.get('globalShortcut');
+    globalShortcut.register(shortcut, async () => {
         if (mainWindow?.isVisible()) {
             dismissAndRestore();
         } else {
             await showWindow();
         }
     });
+}
+
+async function openSettings() {
+    if (!mainWindow) return;
+    await showWindow();
+    mainWindow.webContents.send('window:openSettings');
 }
 
 function registerIpcHandlers() {
@@ -344,6 +353,42 @@ function registerIpcHandlers() {
     ipcMain.handle('window:dismiss', () => {
         dismissAndRestore();
     });
+
+    ipcMain.handle('settings:get', () => {
+        return settings.getAll();
+    });
+
+    ipcMain.handle('settings:save', async (_event, newSettings) => {
+        const previous = settings.getAll();
+        const saved = settings.save(newSettings);
+
+        if (previous.globalShortcut !== saved.globalShortcut) {
+            registerShortcut();
+        }
+
+        if (previous.autoLockMinutes !== saved.autoLockMinutes) {
+            resetAutoLockTimer();
+        }
+
+        if (previous.launchAtLogin !== saved.launchAtLogin) {
+            if (saved.launchAtLogin) {
+                await autoLauncher.enable();
+            } else {
+                await autoLauncher.disable();
+            }
+        }
+
+        if (previous.showInDock !== saved.showInDock) {
+            if (saved.showInDock) {
+                app.dock?.show();
+            } else {
+                app.dock?.hide();
+            }
+        }
+
+        await updateTrayMenu();
+        return saved;
+    });
 }
 
 app.dock?.hide();
@@ -354,6 +399,18 @@ app.whenReady().then(() => {
     createTray();
     registerShortcut();
     registerIpcHandlers();
+
+    powerMonitor.on('lock-screen', async () => {
+        if (settings.get('lockOnScreenLock')) {
+            try {
+                if (autoLockTimer) clearTimeout(autoLockTimer);
+                await bitwarden.lock();
+                if (mainWindow) {
+                    mainWindow.webContents.send('window:show');
+                }
+            } catch (_) { }
+        }
+    });
 });
 
 app.on('will-quit', () => {
