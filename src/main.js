@@ -92,10 +92,6 @@ async function showWindow() {
 
     setTimeout(() => {
         mainWindow?.setAlwaysOnTop(true, 'normal');
-        mainWindow?.webContents.executeJavaScript(`
-            const el = document.querySelector('input:not([style*="display: none"]):not([disabled])');
-            if (el) el.focus();
-        `).catch(() => { });
     }, 150);
 }
 

@@ -13,6 +13,7 @@ let currentItem = null;
 let passwordRevealed = false;
 let pendingEmail = '';
 let pendingPassword = '';
+let isTransitioning = false;
 
 const unlockView = document.getElementById('unlock-view');
 const searchView = document.getElementById('search-view');
@@ -47,6 +48,7 @@ const FIELDS = [
 ];
 
 function switchState(newState, options = {}) {
+    const stateChanged = currentState !== newState;
     currentState = newState;
 
     unlockView.classList.toggle('hidden', newState !== State.UNLOCK);
@@ -56,7 +58,9 @@ function switchState(newState, options = {}) {
     if (newState === State.LIST) {
         detailPanel.classList.add('hidden');
         listPanel.style.flex = '1';
-        searchInput.focus();
+        if (stateChanged) {
+            searchInput.focus();
+        }
     }
 
     if (newState === State.DETAIL) {
@@ -75,8 +79,10 @@ function switchState(newState, options = {}) {
     }
 
     if (newState === State.UNLOCK) {
-        passwordInput.value = '';
-        codeInput.value = '';
+        if (stateChanged) {
+            passwordInput.value = '';
+            codeInput.value = '';
+        }
         statusMessage.textContent = '';
         passwordInput.disabled = false;
         emailInput.disabled = false;
@@ -97,7 +103,9 @@ function switchState(newState, options = {}) {
             emailInput.style.display = '';
             passwordInput.style.display = '';
             unlockHint.style.display = '';
-            emailInput.value = '';
+            if (stateChanged) {
+                emailInput.value = '';
+            }
             statusMessage.textContent = 'Please log in to Bitwarden';
             statusMessage.style.color = '';
             emailInput.focus();
@@ -584,22 +592,34 @@ function focusActiveInput() {
 }
 
 window.bitty.onShow(async () => {
-    focusActiveInput();
-    searchInput.value = '';
+    if (isTransitioning) return;
+    isTransitioning = true;
 
-    const statusResult = await window.bitty.getStatus();
+    try {
+        if (currentState === State.LIST || currentState === State.DETAIL) {
+            focusActiveInput();
+            return;
+        }
 
-    if (!statusResult.success || !statusResult.unlocked) {
-        const needsLogin = statusResult.success && statusResult.status.status === 'unauthenticated';
-        switchState(State.UNLOCK, { needsLogin });
         focusActiveInput();
-        return;
-    }
 
-    switchState(State.LIST);
-    statusIndicator.textContent = '🔓 Unlocked';
-    await performSearch('');
-    searchInput.focus();
+        const statusResult = await window.bitty.getStatus();
+
+        if (!statusResult.success || !statusResult.unlocked) {
+            const needsLogin = statusResult.success && statusResult.status.status === 'unauthenticated';
+            switchState(State.UNLOCK, { needsLogin });
+            focusActiveInput();
+            return;
+        }
+
+        searchInput.value = '';
+        switchState(State.LIST);
+        statusIndicator.textContent = '🔓 Unlocked';
+        await performSearch('');
+        searchInput.focus();
+    } finally {
+        isTransitioning = false;
+    }
 });
 
 async function init() {
