@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitty</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="app">
+    <div id="unlock-view" class="view">
+      <div class="unlock-container">
+        <div class="unlock-icon">🔒</div>
+        <h2 class="unlock-title">Bitty</h2>
+        <div id="spinner" class="spinner"></div>
+        <div id="status-message" class="status-message"></div>
+        <input type="email" id="email-input" class="unlock-input" placeholder="Email address" autocomplete="off"
+          spellcheck="false" style="display: none;">
+        <input type="password" id="password-input" class="unlock-input" placeholder="Master password" autocomplete="off"
+          spellcheck="false" style="display: none;">
+        <input type="text" id="code-input" class="unlock-input" placeholder="Verification code" autocomplete="off"
+          spellcheck="false" style="display: none;">
+        <div id="unlock-hint" class="unlock-hint" style="display: none;">Press Enter to unlock</div>
+      </div>
+    </div>
+
+    <div id="add-view" class="view hidden">
+      <div class="add-header">
+        <span class="add-icon">🔐</span>
+        <h2 class="add-title">New Login Item</h2>
+      </div>
+
+      <div class="add-form">
+        <div class="form-field">
+          <label class="form-label" for="add-name">NAME</label>
+          <input type="text" id="add-name" class="form-input" placeholder="e.g. GitHub" autocomplete="off"
+            spellcheck="false">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="add-username">USERNAME</label>
+          <input type="text" id="add-username" class="form-input" placeholder="e.g. user@example.com" autocomplete="off"
+            spellcheck="false">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="add-password">PASSWORD</label>
+          <div class="password-row">
+            <input type="text" id="add-password" class="form-input" placeholder="Enter or generate" autocomplete="off"
+              spellcheck="false">
+            <span class="generate-hint">⌃G generate</span>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="add-uri">URL</label>
+          <input type="text" id="add-uri" class="form-input" placeholder="e.g. https://github.com" autocomplete="off"
+            spellcheck="false">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="add-notes">NOTES</label>
+          <input type="text" id="add-notes" class="form-input" placeholder="Optional notes" autocomplete="off"
+            spellcheck="false">
+        </div>
+      </div>
+
+      <div id="add-status" class="add-status"></div>
+
+      <div class="status-bar">
+        <span class="status-indicator"></span>
+        <span class="shortcut-hints">
+          <kbd>⌃S</kbd> save
+          <kbd>⌃G</kbd> generate
+          <kbd>Tab</kbd> next
+          <kbd>esc</kbd> cancel
+        </span>
+      </div>
+    </div>
+
+    <div id="search-view" class="view hidden">
+      <div class="search-bar">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="8.5" cy="8.5" r="5.5" />
+          <line x1="13" y1="13" x2="18" y2="18" />
+        </svg>
+        <input type="text" id="search-input" placeholder="Search vault..." autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="content-area">
+        <div id="list-panel" class="list-panel">
+          <div id="results-list" class="results-list"></div>
+          <div id="empty-state" class="empty-state hidden">
+            <span class="empty-icon">🔍</span>
+            <span>No matching entries</span>
+          </div>
+        </div>
+
+        <div id="detail-panel" class="detail-panel hidden">
+          <div class="detail-header">
+            <span class="detail-back">←</span>
+            <span id="detail-title" class="detail-title"></span>
+          </div>
+          <div id="detail-fields" class="detail-fields"></div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span id="status-indicator" class="status-indicator"></span>
+        <span class="shortcut-hints">
+          <kbd>↑↓</kbd> navigate
+          <kbd>→</kbd> details
+          <kbd>←</kbd> back
+          <kbd>↵</kbd> copy
+          <kbd>⌃N</kbd> new
+          <kbd>esc</kbd> close
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
