@@ -45,6 +45,8 @@ function restorePreviousApp() {
     previousApp = null;
 }
 
+let forceQuit = false;
+
 function createWindow() {
     const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
     const windowWidth = 700;
@@ -76,6 +78,13 @@ function createWindow() {
     });
 
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+    mainWindow.on('close', (e) => {
+        if (!forceQuit) {
+            e.preventDefault();
+            hideWindow();
+        }
+    });
 
     mainWindow.on('blur', () => {
         hideWindow();
@@ -411,6 +420,10 @@ app.whenReady().then(() => {
             } catch (_) { }
         }
     });
+});
+
+app.on('before-quit', () => {
+    forceQuit = true;
 });
 
 app.on('will-quit', () => {
