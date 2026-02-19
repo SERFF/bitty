@@ -1,6 +1,7 @@
 const { spawn, execFile } = require('child_process');
 const { clipboard } = require('electron');
 const settings = require('./settings');
+const vaultCache = require('./vaultCache');
 
 function getBwPath() {
   return settings.get('bwPath');
@@ -98,6 +99,9 @@ async function logout() {
   } catch (_) { }
   sessionKey = null;
   cachedItems = [];
+  vaultCache.clearEncryptionKey();
+  vaultCache.clear();
+  vaultCache.clearPasswordHash();
 }
 
 async function getStatus() {
@@ -260,12 +264,12 @@ async function unlock(password) {
 function lock() {
   sessionKey = null;
   cachedItems = [];
+  vaultCache.clearEncryptionKey();
   return runBw(['lock']);
 }
 
 async function sync() {
   await runBw(['sync']);
-  cachedItems = [];
 }
 
 async function listItems() {
@@ -288,7 +292,20 @@ async function listItems() {
       folderId: item.folderId,
     }));
 
+  vaultCache.save(cachedItems);
+
   return cachedItems;
+}
+
+function loadCachedItems(password) {
+  const items = vaultCache.load(password);
+
+  if (items.length === 0) {
+    return false;
+  }
+
+  cachedItems = items;
+  return true;
 }
 
 function searchItems(query) {
@@ -373,6 +390,10 @@ function isUnlocked() {
   return sessionKey !== null;
 }
 
+function setCachedItems(items) {
+  cachedItems = items;
+}
+
 module.exports = {
   getStatus,
   login,
@@ -381,11 +402,13 @@ module.exports = {
   lock,
   sync,
   listItems,
+  loadCachedItems,
   searchItems,
   getItemById,
   copyField,
   createItem,
   generatePassword,
   clearCache,
+  setCachedItems,
   isUnlocked,
 };

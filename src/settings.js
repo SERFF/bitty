@@ -1,4 +1,3 @@
-const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,14 +25,87 @@ const DEFAULTS = {
     serverUrl: '',
 };
 
+const SCHEMA = {
+    autoLockMinutes: { type: 'number', min: 0, max: 60 },
+    clipboardClearSeconds: { type: 'number', min: 0, max: 120 },
+    lockOnClose: { type: 'boolean' },
+    lockOnScreenLock: { type: 'boolean' },
+    globalShortcut: { type: 'string', maxLength: 50 },
+    launchAtLogin: { type: 'boolean' },
+    showInDock: { type: 'boolean' },
+    theme: { type: 'string', allowed: ['system', 'dark', 'light'] },
+    windowPosition: { type: 'string', allowed: ['center', 'left', 'right', 'cursor'] },
+    resultsPerPage: { type: 'number', allowed: [25, 50, 100] },
+    passwordLength: { type: 'number', min: 8, max: 128 },
+    passwordUppercase: { type: 'boolean' },
+    passwordLowercase: { type: 'boolean' },
+    passwordNumbers: { type: 'boolean' },
+    passwordSpecial: { type: 'boolean' },
+    bwPath: { type: 'string', maxLength: 256 },
+    serverUrl: { type: 'string', maxLength: 256 },
+};
+
 let settingsPath = null;
 let cache = null;
+let dataDir = null;
+
+function getDataDir() {
+    if (!dataDir) {
+        const { app } = require('electron');
+        dataDir = app.getPath('userData');
+    }
+
+    return dataDir;
+}
+
+function setDataDir(dir) {
+    dataDir = dir;
+    settingsPath = null;
+    cache = null;
+}
 
 function getSettingsPath() {
     if (!settingsPath) {
-        settingsPath = path.join(app.getPath('userData'), 'settings.json');
+        settingsPath = path.join(getDataDir(), 'settings.json');
     }
     return settingsPath;
+}
+
+function isValidValue(key, value) {
+    const rule = SCHEMA[key];
+    if (!rule) return false;
+
+    if (typeof value !== rule.type) return false;
+
+    if (rule.allowed && !rule.allowed.includes(value)) return false;
+
+    if (rule.type === 'number') {
+        if (rule.min !== undefined && value < rule.min) return false;
+        if (rule.max !== undefined && value > rule.max) return false;
+        if (!Number.isFinite(value)) return false;
+    }
+
+    if (rule.type === 'string') {
+        if (rule.maxLength !== undefined && value.length > rule.maxLength) return false;
+    }
+
+    return true;
+}
+
+function validate(settings) {
+    if (!settings || typeof settings !== 'object') return { ...DEFAULTS };
+
+    const validated = {};
+
+    for (const key of Object.keys(DEFAULTS)) {
+        if (key in settings && isValidValue(key, settings[key])) {
+            validated[key] = settings[key];
+        } else {
+            validated[key] = DEFAULTS[key];
+        }
+    }
+
+    return validated;
 }
 
 function load() {
@@ -41,7 +113,7 @@ function load() {
 
     try {
         const raw = fs.readFileSync(getSettingsPath(), 'utf-8');
-        cache = { ...DEFAULTS, ...JSON.parse(raw) };
+        cache = validate(JSON.parse(raw));
     } catch {
         cache = { ...DEFAULTS };
     }
@@ -50,7 +122,7 @@ function load() {
 }
 
 function save(settings) {
-    cache = { ...DEFAULTS, ...settings };
+    cache = validate(settings);
     const dir = path.dirname(getSettingsPath());
 
     if (!fs.existsSync(dir)) {
@@ -74,4 +146,4 @@ function getDefaults() {
     return { ...DEFAULTS };
 }
 
-module.exports = { load, save, get, getAll, getDefaults };
+module.exports = { load, save, get, getAll, getDefaults, validate, isValidValue, setDataDir };

@@ -22,6 +22,7 @@ let passwordRevealed = false;
 let pendingEmail = '';
 let pendingPassword = '';
 let isTransitioning = false;
+let isLoginMode = false;
 
 const unlockView = document.getElementById('unlock-view');
 const searchView = document.getElementById('search-view');
@@ -143,6 +144,7 @@ function switchState(newState, options = {}) {
             statusMessage.textContent = 'Connecting to vault…';
             statusMessage.style.color = '';
         } else if (options.needsLogin) {
+            isLoginMode = true;
             spinner.classList.remove('visible');
             emailInput.style.display = '';
             passwordInput.style.display = '';
@@ -154,6 +156,7 @@ function switchState(newState, options = {}) {
             statusMessage.style.color = '';
             emailInput.focus();
         } else {
+            isLoginMode = false;
             spinner.classList.remove('visible');
             emailInput.style.display = 'none';
             passwordInput.style.display = '';
@@ -288,7 +291,11 @@ function renderDetailFields(item) {
         el.appendChild(valueDiv);
 
         el.addEventListener('click', () => {
-            copyField(item.id, field.key);
+            if (field.key === 'uri') {
+                openUrl(item[field.key]);
+            } else {
+                copyField(item.id, field.key);
+            }
         });
 
         detailFields.appendChild(el);
@@ -305,6 +312,11 @@ async function copyField(id, fieldKey) {
     if (!result.success) return;
 
     showToast(`Copied ${fieldKey}`);
+}
+
+async function openUrl(url) {
+    if (!url) return;
+    await window.bitty.openUrl(url);
 }
 
 function showToast(message) {
@@ -371,9 +383,7 @@ async function handleUnlock() {
     statusMessage.textContent = 'Unlocking…';
 
     try {
-        const statusResult = await window.bitty.getStatus();
-
-        if (statusResult.success && statusResult.status.status === 'unauthenticated') {
+        if (isLoginMode) {
             if (!email) {
                 spinner.classList.remove('visible');
                 statusMessage.textContent = 'Email address required for login';
@@ -408,6 +418,8 @@ async function handleUnlock() {
                 passwordInput.focus();
                 return;
             }
+
+            showVaultList(loginResult.fromCache);
         } else {
             const unlockResult = await window.bitty.unlock(password);
             if (!unlockResult.success) {
@@ -419,12 +431,9 @@ async function handleUnlock() {
                 passwordInput.focus();
                 return;
             }
-        }
 
-        statusMessage.textContent = 'Loading vault…';
-        switchState(State.LIST);
-        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
-        await performSearch('');
+            showVaultList(unlockResult.fromCache);
+        }
     } catch (err) {
         spinner.classList.remove('visible');
         statusMessage.textContent = err.message || 'Something went wrong';
@@ -436,6 +445,18 @@ async function handleUnlock() {
     }
 }
 
+function showVaultList(fromCache) {
+    switchState(State.LIST);
+
+    if (fromCache) {
+        statusIndicator.innerHTML = '<span class="status-dot syncing"></span> Syncing…';
+    } else {
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
+    }
+
+    performSearch('');
+}
+
 async function handleCodeSubmit() {
     const code = codeInput.value.trim();
     if (!code) return;
@@ -444,7 +465,7 @@ async function handleCodeSubmit() {
     statusMessage.textContent = 'Verifying…';
 
     try {
-        const result = await window.bitty.submitCode(code);
+        const result = await window.bitty.submitCode(code, pendingPassword);
 
         if (!result.success) {
             statusMessage.textContent = result.error || 'Invalid code';
@@ -456,9 +477,7 @@ async function handleCodeSubmit() {
 
         pendingEmail = '';
         pendingPassword = '';
-        switchState(State.LIST);
-        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
-        await performSearch('');
+        showVaultList(result.fromCache);
     } catch (err) {
         statusMessage.textContent = err.message || 'Verification failed';
         codeInput.value = '';
@@ -519,7 +538,7 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    if (e.ctrlKey && e.key === ',') {
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
         openSettingsView();
         return;
@@ -612,7 +631,14 @@ async function handleGeneratePassword() {
     addStatus.className = 'add-status';
 
     try {
-        const result = await window.bitty.generatePassword({ length: 20 });
+        const settings = await window.bitty.getSettings();
+        const result = await window.bitty.generatePassword({
+            length: settings.passwordLength,
+            uppercase: settings.passwordUppercase,
+            lowercase: settings.passwordLowercase,
+            numbers: settings.passwordNumbers,
+            special: settings.passwordSpecial,
+        });
 
         if (result.success) {
             addPassword.value = result.password;
@@ -690,7 +716,11 @@ function handleDetailKeyboard(e) {
         e.preventDefault();
         const field = fields[selectedFieldIndex];
         if (field && currentItem) {
-            copyField(currentItem.id, field.key);
+            if (field.key === 'uri') {
+                openUrl(currentItem[field.key]);
+            } else {
+                copyField(currentItem.id, field.key);
+            }
         }
         return;
     }
@@ -729,18 +759,27 @@ window.bitty.onShow(async () => {
     isTransitioning = true;
 
     try {
-        if (currentState === State.LIST || currentState === State.DETAIL || currentState === State.SETTINGS) {
+        const quickCheck = await window.bitty.isUnlocked();
+
+        if (!quickCheck.unlocked) {
+            switchState(State.UNLOCK);
             focusActiveInput();
+
+            const statusResult = await window.bitty.getStatus();
+            const needsLogin = statusResult.success && statusResult.status.status === 'unauthenticated';
+
+            if (needsLogin) {
+                switchState(State.UNLOCK, { needsLogin });
+                focusActiveInput();
+            }
+
             return;
         }
 
-        focusActiveInput();
-
-        const statusResult = await window.bitty.getStatus();
-
-        if (!statusResult.success || !statusResult.unlocked) {
-            const needsLogin = statusResult.success && statusResult.status.status === 'unauthenticated';
-            switchState(State.UNLOCK, { needsLogin });
+        if (currentState === State.LIST || currentState === State.DETAIL || currentState === State.SETTINGS) {
+            if (currentState === State.LIST && items.length === 0) {
+                await performSearch('');
+            }
             focusActiveInput();
             return;
         }
@@ -775,6 +814,9 @@ init();
 
 async function openSettingsView() {
     if (currentState === State.UNLOCK) return;
+
+    const lockCheck = await window.bitty.isUnlocked();
+    if (!lockCheck.unlocked) return;
 
     previousState = (currentState === State.SETTINGS) ? previousState : currentState;
     switchState(State.SETTINGS);
@@ -892,4 +934,20 @@ let settingsInputTimer = null;
 
 window.bitty.onOpenSettings(() => {
     openSettingsView();
+});
+
+window.bitty.onSyncComplete(async () => {
+    if (currentState === State.LIST || currentState === State.DETAIL) {
+        await performSearch(searchInput.value);
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
+        showToast('Vault synced');
+    }
+});
+
+window.bitty.onUnlockFailed(() => {
+    items = [];
+    switchState(State.UNLOCK, { needsLogin: false });
+    statusMessage.textContent = 'Session expired. Please unlock again.';
+    statusMessage.style.color = 'var(--danger)';
+    passwordInput.focus();
 });

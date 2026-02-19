@@ -173,17 +173,25 @@ Bitty is designed with security in mind:
 ```
 bitty/
 ├── assets/
-│   ├── icon.icns          # macOS app icon
-│   ├── icon.png           # Source icon
-│   └── iconTemplate.png   # Menu bar tray icon
+│   ├── icon.icns            # macOS app icon
+│   ├── icon.png             # Source icon
+│   ├── iconTemplate.png     # Menu bar tray icon
+│   └── iconTemplate@2x.png # Menu bar tray icon (Retina)
 ├── src/
-│   ├── main.js            # Electron main process
-│   ├── bitwarden.js       # Bitwarden CLI wrapper
-│   ├── preload.js         # Context bridge (IPC API)
+│   ├── main.js              # Electron main process
+│   ├── bitwarden.js         # Bitwarden CLI wrapper
+│   ├── preload.js           # Context bridge (IPC API)
+│   ├── settings.js          # Persistent settings with schema validation
+│   ├── vaultCache.js        # Encrypted vault cache (AES-256-GCM)
 │   └── renderer/
-│       ├── index.html     # App markup
-│       ├── styles.css     # Styling
-│       └── app.js         # Renderer logic
+│       ├── index.html       # App markup
+│       ├── styles.css       # Styling
+│       └── app.js           # Renderer logic
+├── tests/
+│   ├── bitwarden.test.mjs   # Bitwarden module tests
+│   ├── settings.test.mjs    # Settings validation tests
+│   └── vaultCache.test.mjs  # Vault cache encryption tests
+├── vitest.config.mjs
 ├── package.json
 └── README.md
 ```

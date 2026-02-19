@@ -455,6 +455,23 @@ body {
   display: inline-block;
 }
 
+.status-dot.syncing {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .shortcut-hints {
   font-size: 10px;
   color: var(--text-tertiary);
