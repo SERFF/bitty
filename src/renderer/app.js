@@ -5,6 +5,13 @@ const State = {
     ADD: 'add',
 };
 
+const MONOGRAM_COLORS = [
+    '#FF453A', '#FF6961', '#FF9F0A', '#FFD60A',
+    '#30D158', '#34C759', '#63E6E2', '#64D2FF',
+    '#0A84FF', '#5E5CE6', '#BF5AF2', '#FF2D55',
+    '#AC8E68', '#8E8E93',
+];
+
 let currentState = State.UNLOCK;
 let items = [];
 let selectedIndex = 0;
@@ -46,6 +53,20 @@ const FIELDS = [
     { key: 'uri', label: 'URL' },
     { key: 'notes', label: 'Notes' },
 ];
+
+function getMonogramColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return MONOGRAM_COLORS[Math.abs(hash) % MONOGRAM_COLORS.length];
+}
+
+function getMonogramLetter(name) {
+    if (!name) return '?';
+    const cleaned = name.replace(/^(https?:\/\/)?(www\.)?/i, '').trim();
+    return (cleaned[0] || '?').toUpperCase();
+}
 
 function switchState(newState, options = {}) {
     const stateChanged = currentState !== newState;
@@ -96,7 +117,7 @@ function switchState(newState, options = {}) {
             emailInput.style.display = 'none';
             passwordInput.style.display = 'none';
             unlockHint.style.display = 'none';
-            statusMessage.textContent = 'Connecting to vault...';
+            statusMessage.textContent = 'Connecting to vault…';
             statusMessage.style.color = '';
         } else if (options.needsLogin) {
             spinner.classList.remove('visible');
@@ -106,7 +127,7 @@ function switchState(newState, options = {}) {
             if (stateChanged) {
                 emailInput.value = '';
             }
-            statusMessage.textContent = 'Please log in to Bitwarden';
+            statusMessage.textContent = 'Sign in to Bitwarden';
             statusMessage.style.color = '';
             emailInput.focus();
         } else {
@@ -121,7 +142,28 @@ function switchState(newState, options = {}) {
     }
 }
 
-function renderResults() {
+let renderedItemIds = [];
+
+function updateSelection() {
+    const children = resultsList.children;
+    for (let i = 0; i < children.length; i++) {
+        children[i].classList.toggle('selected', i === selectedIndex);
+    }
+    scrollToSelected();
+}
+
+function renderResults(selectionOnly = false) {
+    const currentIds = items.map((item) => item.id);
+    const isSameList = selectionOnly ||
+        (currentIds.length === renderedItemIds.length &&
+            currentIds.every((id, i) => id === renderedItemIds[i]));
+
+    if (isSameList && resultsList.children.length > 0) {
+        updateSelection();
+        return;
+    }
+
+    renderedItemIds = currentIds;
     resultsList.innerHTML = '';
 
     if (items.length === 0) {
@@ -134,13 +176,21 @@ function renderResults() {
     items.forEach((item, index) => {
         const el = document.createElement('div');
         el.className = `result-item${index === selectedIndex ? ' selected' : ''}`;
+
+        const color = getMonogramColor(item.name);
+        const letter = getMonogramLetter(item.name);
+
         el.innerHTML = `
-      <span class="result-name">${escapeHtml(item.name)}</span>
-      <span class="result-username">${escapeHtml(item.username || '—')}</span>
+      <div class="monogram" style="background: ${color}">${letter}</div>
+      <div class="result-item-text">
+        <span class="result-name">${escapeHtml(item.name)}</span>
+        <span class="result-username">${escapeHtml(item.username || '—')}</span>
+      </div>
+      <span class="result-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
     `;
         el.addEventListener('click', () => {
             selectedIndex = index;
-            renderResults();
+            updateSelection();
             openDetail(item);
         });
         resultsList.appendChild(el);
@@ -210,7 +260,7 @@ function showToast(message) {
 
     const toast = document.createElement('div');
     toast.className = 'copied-toast';
-    toast.textContent = message;
+    toast.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${escapeHtml(message)}`;
     document.body.appendChild(toast);
 
     setTimeout(() => toast.remove(), 1200);
@@ -252,7 +302,7 @@ async function handleUnlock() {
     codeInput.disabled = true;
     spinner.classList.add('visible');
     unlockHint.style.display = 'none';
-    statusMessage.textContent = 'Unlocking...';
+    statusMessage.textContent = 'Unlocking…';
 
     try {
         const statusResult = await window.bitty.getStatus();
@@ -305,9 +355,9 @@ async function handleUnlock() {
             }
         }
 
-        statusMessage.textContent = 'Loading vault...';
+        statusMessage.textContent = 'Loading vault…';
         switchState(State.LIST);
-        statusIndicator.textContent = '🔓 Unlocked';
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
         await performSearch('');
     } catch (err) {
         spinner.classList.remove('visible');
@@ -325,7 +375,7 @@ async function handleCodeSubmit() {
     if (!code) return;
 
     codeInput.disabled = true;
-    statusMessage.textContent = 'Verifying...';
+    statusMessage.textContent = 'Verifying…';
 
     try {
         const result = await window.bitty.submitCode(code);
@@ -341,7 +391,7 @@ async function handleCodeSubmit() {
         pendingEmail = '';
         pendingPassword = '';
         switchState(State.LIST);
-        statusIndicator.textContent = '🔓 Unlocked';
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
         await performSearch('');
     } catch (err) {
         statusMessage.textContent = err.message || 'Verification failed';
@@ -441,7 +491,7 @@ async function handleSaveItem() {
     }
 
     addFormInputs().forEach((input) => { input.disabled = true; });
-    addStatus.textContent = 'Saving...';
+    addStatus.textContent = 'Saving…';
     addStatus.className = 'add-status';
 
     try {
@@ -475,7 +525,7 @@ async function handleGeneratePassword() {
     if (generatingPassword) return;
     generatingPassword = true;
 
-    addStatus.textContent = 'Generating password...';
+    addStatus.textContent = 'Generating password…';
     addStatus.className = 'add-status';
 
     try {
@@ -614,7 +664,7 @@ window.bitty.onShow(async () => {
 
         searchInput.value = '';
         switchState(State.LIST);
-        statusIndicator.textContent = '🔓 Unlocked';
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
         await performSearch('');
         searchInput.focus();
     } finally {
@@ -633,7 +683,7 @@ async function init() {
         switchState(State.UNLOCK, { needsLogin: false });
     } else {
         switchState(State.LIST);
-        statusIndicator.textContent = '🔓 Unlocked';
+        statusIndicator.innerHTML = '<span class="status-dot"></span> Unlocked';
         await performSearch('');
     }
 }

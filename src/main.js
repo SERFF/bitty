@@ -40,8 +40,8 @@ function restorePreviousApp() {
 
 function createWindow() {
     const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
-    const windowWidth = 680;
-    const windowHeight = 420;
+    const windowWidth = 700;
+    const windowHeight = 450;
 
     mainWindow = new BrowserWindow({
         width: windowWidth,
